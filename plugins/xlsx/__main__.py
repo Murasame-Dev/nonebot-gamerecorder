@@ -1,6 +1,7 @@
 from nonebot import on_command, get_driver
 from nonebot.adapters.onebot.v11 import Message, MessageSegment
 from nonebot.params import CommandArg
+from nonebot.permission import SUPERUSER
 from nonebot.exception import FinishedException
 from openpyxl import load_workbook, Workbook
 from openpyxl.styles import PatternFill, Alignment
@@ -75,8 +76,8 @@ def register_game_commands():
         return
     
     for game_name in games:
-        # 创建命令处理器
-        handler = on_command(game_name, priority=10)
+        # 创建命令处理器（添加SUPERUSER权限）
+        handler = on_command(game_name, priority=10, permission=SUPERUSER)
         
         # 创建处理函数的闭包，确保每个命令都有自己的game_name
         def create_handler(game_name):
@@ -141,7 +142,7 @@ def register_excel_commands():
     register_game_commands()
 
 # 注册xlsximport命令
-xlsximport_handler = on_command("xlsximport", priority=5)
+xlsximport_handler = on_command("xlsximport", priority=5, permission=SUPERUSER)
 
 @xlsximport_handler.handle()
 async def handle_xlsximport(args: Message = CommandArg()):
@@ -163,7 +164,7 @@ async def handle_xlsximport(args: Message = CommandArg()):
     await xlsximport_handler.finish(result)
 
 # 注册xlsxexport命令
-xlsxexport_handler = on_command("xlsxexport", priority=5)
+xlsxexport_handler = on_command("xlsxexport", priority=5, permission=SUPERUSER)
 
 @xlsxexport_handler.handle()
 async def handle_xlsxexport(args: Message = CommandArg()):
@@ -174,11 +175,11 @@ async def handle_xlsxexport(args: Message = CommandArg()):
         # 列出可用游戏
         result = excel_exporter.list_available_games()
         await xlsxexport_handler.finish(f"{result}\n\n使用方法:\n/xlsxexport <游戏名> - 导出指定游戏\n/xlsxexport <游戏名> upload - 导出并上传文件\n/xlsxexport all - 导出所有游戏\n/xlsxexport all upload - 导出所有游戏并上传")
-    
-    # 解析参数
+      # 解析参数
     game_name = cmd_args[0]
     upload_file = len(cmd_args) > 1 and cmd_args[1].lower() == "upload"
-      # 检查是否为导出全部
+    
+    # 检查是否为导出全部
     if game_name.lower() == "all":
         if upload_file:
             # 导出所有游戏并上传文件
@@ -195,6 +196,45 @@ async def handle_xlsxexport(args: Message = CommandArg()):
             # 执行单个游戏导出
             result = excel_exporter.export_game_to_excel(game_name)
             await xlsxexport_handler.finish(result)
+
+# 注册xlsxcreate命令
+xlsxcreate_handler = on_command("xlsxcreate", priority=5, permission=SUPERUSER)
+
+@xlsxcreate_handler.handle()
+async def handle_xlsxcreate(args: Message = CommandArg()):
+    """处理手动创建游戏命令"""
+    game_name = args.extract_plain_text().strip()
+    
+    if not game_name:
+        await xlsxcreate_handler.finish("❌ 请提供游戏名称！\n使用方法: /xlsxcreate <游戏名>")
+    
+    # 检查游戏名是否已存在
+    existing_games = db_manager.get_games_list()
+    existing_game_names = [game[0] for game in existing_games]
+    
+    if game_name in existing_game_names:
+        await xlsxcreate_handler.finish(f"❌ 游戏 '{game_name}' 已存在！")
+    
+    try:
+        # 添加新游戏到数据库
+        game_id = db_manager.add_game(game_name)
+        
+        if game_id:
+            # 重新注册命令以包含新创建的游戏
+            register_game_commands()
+            
+            result_msg = f"✅ 成功创建游戏: {game_name}\n"
+            result_msg += f"现在可以使用以下命令:\n"
+            result_msg += f"• /{game_name} <用户名> +1 - 添加记录\n"
+            result_msg += f"• /{game_name} <用户名> <次数> - 批量添加记录\n"
+            result_msg += f"• /xlsxexport {game_name} - 导出数据"
+            
+            await xlsxcreate_handler.finish(result_msg)
+        else:
+            await xlsxcreate_handler.finish(f"❌ 创建游戏失败: {game_name}")
+            
+    except Exception as e:
+        await xlsxcreate_handler.finish(f"❌ 创建游戏时出错: {str(e)}")
 
 # 在插件加载时注册命令
 driver = get_driver()
