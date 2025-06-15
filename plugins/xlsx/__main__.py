@@ -229,6 +229,62 @@ async def handle_xlsxcreate(args: Message = CommandArg()):
     except Exception as e:
         await xlsxcreate_handler.finish(f"❌ 创建游戏时出错: {str(e)}")
 
+# 注册xlsxlookup命令
+xlsxlookup_handler = on_command("xlsxlookup", priority=5, permission=SUPERUSER)
+
+@xlsxlookup_handler.handle()
+async def handle_xlsxlookup(args: Message = CommandArg()):
+    """处理查询用户记录命令"""
+    args_text = args.extract_plain_text().strip()
+    
+    if not args_text:
+        await xlsxlookup_handler.finish("❌ 请提供查询参数！\n使用方法: /xlsxlookup <游戏名> <用户名> [记录数量]")
+    
+    # 解析参数
+    parts = args_text.split()
+    if len(parts) < 2:
+        await xlsxlookup_handler.finish("❌ 参数不足！\n使用方法: /xlsxlookup <游戏名> <用户名> [记录数量]")
+    
+    game_name = parts[0]
+    username = parts[1]
+    
+    # 解析记录数量（可选参数）
+    limit = plugin_config.default_lookup_count
+    if len(parts) >= 3:
+        try:
+            limit = int(parts[2])
+            if limit <= 0 or limit > 20:
+                await xlsxlookup_handler.finish("❌ 记录数量必须在1-20之间！")
+        except ValueError:
+            await xlsxlookup_handler.finish("❌ 记录数量必须是数字！")
+    
+    try:
+        # 获取用户摘要信息
+        summary = db_manager.get_user_summary(username, game_name, limit)
+        
+        if "error" in summary:
+            await xlsxlookup_handler.finish(f"❌ {summary['error']}")
+        
+        if not summary["has_records"]:
+            await xlsxlookup_handler.finish(f"❌ 用户 '{username}' 在游戏 '{game_name}' 中没有记录")
+        
+        # 构建响应消息
+        response_msg = f"📊 查询结果\n"
+        response_msg += f"🎮 游戏: {summary['game_name']}\n"
+        response_msg += f"👤 用户: {summary['username']}\n"
+        response_msg += f"📈 当前进度: {summary['completion_progress']}\n"
+        response_msg += f"📝 总记录数: {summary['total_count']}\n\n"
+        
+        # 显示最新记录
+        response_msg += f"🕒 最新 {len(summary['latest_records'])} 条记录:\n"
+        for i, (date, count) in enumerate(summary['latest_records'], 1):
+            response_msg += f"{i}. {date} - 第{count}次\n"
+        
+        await xlsxlookup_handler.finish(response_msg)
+        
+    except Exception as e:
+        await xlsxlookup_handler.finish(f"❌ 查询失败: {str(e)}")
+
 # 在插件加载时注册命令
 driver = get_driver()
 
