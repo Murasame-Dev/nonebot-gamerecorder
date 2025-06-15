@@ -1,5 +1,5 @@
 from nonebot import on_command, get_driver
-from nonebot.adapters.onebot.v11 import Message, MessageSegment
+from nonebot.adapters.onebot.v11 import Message, MessageSegment, Bot, GroupMessageEvent, PrivateMessageEvent, MessageEvent
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 from nonebot.exception import FinishedException
@@ -11,7 +11,7 @@ import re
 import glob
 import base64
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 from .config import Config
 from .database import DatabaseManager
 from .excel_importer import ExcelImporter
@@ -48,19 +48,14 @@ def find_latest_export_file(game_name: str) -> Optional[str]:
     if not matching_files:
         return None
     
-    # 按修改时间排序，返回最新的文件
+    # 按修改时间排序，获取最新的文件
     matching_files.sort(key=os.path.getmtime, reverse=True)
     return matching_files[0]
 
 def get_games_from_database():
-    """从数据库获取所有游戏"""
-    try:
-        games = db_manager.get_games_list()
-        return [game[0] for game in games]
-    except Exception as e:
-        if plugin_config.debug_mode:
-            print(f"获取数据库游戏失败: {e}")
-        return []
+    """从数据库获取所有游戏名称"""
+    games = db_manager.get_games_list()
+    return [game[0] for game in games]
 
 def register_game_commands():
     """基于数据库游戏表注册命令"""
@@ -116,30 +111,28 @@ async def handle_excel_command(game_name: str, args: Message = CommandArg()):
     username = " ".join(parts[:-1])  # 用户名可能包含空格
     
     # 解析次数
-    count = 1  # 默认次数
     if count_part == "+1":
         count = 1
     elif count_part.isdigit():
         count = int(count_part)
-        if count <= 0 or count > 100:  # 限制次数范围
-            return f"❌ 次数必须在1-100之间！"
     else:
-        return f"❌ 命令格式错误！请使用以下格式：\n• /{game_name} <名字> +1\n• /{game_name} <名字> <次数>"
+        return f"❌ 无效的次数格式！请使用 +1 或数字（如：/{game_name} {username} 5）"
     
-    if not username:
-        return f"❌ 用户名不能为空！"
+    # 验证次数范围
+    if count <= 0 or count > 100:
+        return f"❌ 次数必须在1-100之间！"
     
     try:
-        result = db_manager.add_user_record(username, game_name, count)
-        return result
+        # 添加用户记录
+        result = db_manager.add_user_record(game_name, username, count)
         
+        if count == 1:
+            return f"✅ 已为 {username} 添加1次 {game_name} 记录\n{result}"
+        else:
+            return f"✅ 已为 {username} 添加{count}次 {game_name} 记录\n{result}"
+            
     except Exception as e:
-        return f"❌ 处理出错: {str(e)}"
-
-def register_excel_commands():
-    """注册Excel命令 - 已弃用，使用register_game_commands替代"""
-    print("⚠️  register_excel_commands 已弃用，请使用 register_game_commands")
-    register_game_commands()
+        return f"❌ 添加记录失败: {str(e)}"
 
 # 注册xlsximport命令
 xlsximport_handler = on_command("xlsximport", priority=5, permission=SUPERUSER)
@@ -150,18 +143,18 @@ async def handle_xlsximport(args: Message = CommandArg()):
     filename = args.extract_plain_text().strip()
     
     if not filename:
-        # 列出可用文件
+        # 如果没有指定文件名，列出可用文件
         result = excel_importer.list_available_files()
-        await xlsximport_handler.finish(f"{result}\n\n使用方法: /xlsximport <文件名>")
-      # 执行导入
-    result = excel_importer.import_excel_file(filename)
-    
-    # 如果导入成功，重新注册命令以包含新导入的游戏
-    if result.startswith("✅"):
-        register_game_commands()
-        print(f"已重新注册命令，当前命令数: {len(command_handlers)}")
-    
-    await xlsximport_handler.finish(result)
+        await xlsximport_handler.finish(result)
+    else:
+        # 导入指定文件
+        result = excel_importer.import_excel_file(filename)
+        
+        # 如果导入成功，重新注册游戏命令
+        if result.startswith("✅"):
+            register_game_commands()
+        
+        await xlsximport_handler.finish(result)
 
 # 注册xlsxexport命令
 xlsxexport_handler = on_command("xlsxexport", priority=5, permission=SUPERUSER)
@@ -169,26 +162,26 @@ xlsxexport_handler = on_command("xlsxexport", priority=5, permission=SUPERUSER)
 @xlsxexport_handler.handle()
 async def handle_xlsxexport(args: Message = CommandArg()):
     """处理Excel导出命令"""
-    cmd_args = args.extract_plain_text().strip().split()
+    args_text = args.extract_plain_text().strip()
     
-    if not cmd_args:
-        # 列出可用游戏
-        result = excel_exporter.list_available_games()
-        await xlsxexport_handler.finish(f"{result}\n\n使用方法:\n/xlsxexport <游戏名> - 导出指定游戏\n/xlsxexport <游戏名> upload - 导出并上传文件\n/xlsxexport all - 导出所有游戏\n/xlsxexport all upload - 导出所有游戏并上传")
-      # 解析参数
-    game_name = cmd_args[0]
-    upload_file = len(cmd_args) > 1 and cmd_args[1].lower() == "upload"
+    # 检查是否包含 --upload 参数
+    upload_file = "--upload" in args_text
+    if upload_file:
+        args_text = args_text.replace("--upload", "").strip()
     
-    # 检查是否为导出全部
-    if game_name.lower() == "all":
+    if not args_text:
+        await xlsxexport_handler.finish("❌ 请提供游戏名称或使用 'all' 导出所有游戏\n使用方法: /xlsxexport <游戏名|all> [--upload]")
+    
+    if args_text.lower() == "all":
         if upload_file:
-            # 导出所有游戏并上传文件
+            # 导出所有游戏并上传合并文件
             await handle_export_all_and_upload()
         else:
             # 使用合并导出功能，将所有游戏合并到一个Excel文件的不同sheet中
             result = excel_exporter.export_all_games_to_single_file()
             await xlsxexport_handler.finish(result)
     else:
+        game_name = args_text
         if upload_file:
             # 导出指定游戏并上传文件
             await handle_export_and_upload(game_name)
@@ -244,7 +237,8 @@ async def startup():
     print("Excel插件正在启动...")
     print(f"配置的Excel目录: {plugin_config.excel_folder}")
     print(f"目录是否存在: {os.path.exists(plugin_config.excel_folder)}")
-      # 如果目录不存在，尝试创建
+    
+    # 如果目录不存在，尝试创建
     if not os.path.exists(plugin_config.excel_folder):
         try:
             os.makedirs(plugin_config.excel_folder, exist_ok=True)
@@ -308,7 +302,7 @@ async def upload_file_to_chat(file_path: str, filename: Optional[str] = None) ->
                 }
             )
             
-            message += MessageSegment.text(f"� 正在上传文件: {filename} ({file_size_mb:.2f}MB)")
+            message += MessageSegment.text(f"📤 正在上传文件: {filename} ({file_size_mb:.2f}MB)")
             message += file_msg
             
             return message
