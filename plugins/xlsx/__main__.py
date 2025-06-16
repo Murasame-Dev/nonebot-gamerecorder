@@ -274,14 +274,16 @@ async def handle_xlsxlookup(args: Message = CommandArg()):
         response_msg += f"👤 用户: {summary['username']}\n"
         response_msg += f"📈 当前进度: {summary['completion_progress']}\n"
         response_msg += f"📝 总记录数: {summary['total_count']}\n\n"
-        
-        # 显示最新记录
+          # 显示最新记录
         response_msg += f"🕒 最新 {len(summary['latest_records'])} 条记录:\n"
         for i, (date, count) in enumerate(summary['latest_records'], 1):
             response_msg += f"{i}. {date} - 第{count}次\n"
         
         await xlsxlookup_handler.finish(response_msg)
         
+    except FinishedException:
+        # 重新抛出FinishedException，这是NoneBot的正常流程控制
+        raise
     except Exception as e:
         await xlsxlookup_handler.finish(f"❌ 查询失败: {str(e)}")
 
