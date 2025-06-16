@@ -47,8 +47,7 @@ class ExcelImporter:
             ws = wb.active
             
             if ws is None:
-                raise ValueError("Excel文件格式错误")
-            
+                raise ValueError("Excel文件格式错误")            
             data = []
             for row in range(1, ws.max_row + 1):
                 row_data = []
@@ -58,7 +57,6 @@ class ExcelImporter:
                         row_data.append(str(cell_value))
                     else:
                         row_data.append("")
-                
                 # 只添加非空行（至少A列有数据）
                 if row_data and row_data[0].strip():
                     data.append(row_data)
@@ -88,10 +86,28 @@ class ExcelImporter:
             if not excel_data:
                 return f"❌ 文件 {filename} 没有有效数据"
             
-            # 导入到数据库
-            imported_count = self.db_manager.import_from_excel_data(game_name, excel_data)
+            # 使用对比导入功能
+            result = self.db_manager.import_from_excel_data_with_comparison(game_name, excel_data)
             
-            return f"✅ 成功导入文件: {filename}\n游戏: {game_name}\n导入记录数: {imported_count}"
+            # 构建返回消息
+            message = f"✅ 成功导入文件: {filename}\n"
+            message += f"🎮 游戏: {result['game_name']}\n"
+            
+            if result['is_existing_game']:
+                message += f"📊 数据库对比结果:\n"
+                message += f"  • 导入前记录数: {result['records_before']}\n"
+                message += f"  • 导入后记录数: {result['records_after']}\n"
+                message += f"  • 新增记录数: {result['new_records']}\n"
+                message += f"  • 处理记录数: {result['imported_count']}"
+                
+                if result['new_records'] == 0:
+                    message += f"\n💡 提示: 没有新增记录，可能数据已存在"
+                elif result['new_records'] != result['imported_count']:
+                    message += f"\n💡 提示: 部分记录可能已存在或重复"
+            else:
+                message += f"📝 新建游戏，导入记录数: {result['imported_count']}"
+            
+            return message
             
         except Exception as e:
             return f"❌ 导入失败: {str(e)}"
@@ -115,10 +131,28 @@ class ExcelImporter:
             if not excel_data:
                 return f"❌ 文件 {os.path.basename(file_path)} 没有有效数据"
             
-            # 导入到数据库
-            imported_count = self.db_manager.import_from_excel_data(game_name, excel_data)
+            # 使用对比导入功能
+            result = self.db_manager.import_from_excel_data_with_comparison(game_name, excel_data)
             
-            return f"✅ 成功导入文件: {os.path.basename(file_path)}\n游戏: {game_name}\n导入记录数: {imported_count}"
+            # 构建返回消息
+            message = f"✅ 成功导入文件: {os.path.basename(file_path)}\n"
+            message += f"🎮 游戏: {result['game_name']}\n"
+            
+            if result['is_existing_game']:
+                message += f"📊 数据库对比结果:\n"
+                message += f"  • 导入前记录数: {result['records_before']}\n"
+                message += f"  • 导入后记录数: {result['records_after']}\n"
+                message += f"  • 新增记录数: {result['new_records']}\n"
+                message += f"  • 处理记录数: {result['imported_count']}"
+                
+                if result['new_records'] == 0:
+                    message += f"\n💡 提示: 没有新增记录，可能数据已存在"
+                elif result['new_records'] != result['imported_count']:
+                    message += f"\n💡 提示: 部分记录可能已存在或重复"
+            else:
+                message += f"📝 新建游戏，导入记录数: {result['imported_count']}"
+            
+            return message
             
         except Exception as e:
             return f"❌ 导入失败: {str(e)}"

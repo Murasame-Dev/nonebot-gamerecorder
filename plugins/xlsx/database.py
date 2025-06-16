@@ -378,3 +378,46 @@ class DatabaseManager:
             "has_records": True,
             "completion_progress": f"{current_count}/{self.config.completion_count}"
         }
+    
+    def get_game_records_count(self, game_name: str) -> int:
+        """获取指定游戏的总记录数"""
+        game_id = self.get_game_id(game_name)
+        if not game_id:
+            return 0
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT COUNT(*) FROM records r
+            JOIN users u ON r.user_id = u.id
+            WHERE u.game_id = ?
+        ''', (game_id,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        return result[0] if result else 0
+
+    def import_from_excel_data_with_comparison(self, game_name: str, excel_data: List[List[str]]) -> Dict[str, Any]:
+        """从Excel数据导入到数据库，并返回对比结果"""
+        # 获取导入前的记录数
+        records_before = self.get_game_records_count(game_name)
+        is_existing_game = self.get_game_id(game_name) is not None
+        
+        # 执行导入
+        imported_count = self.import_from_excel_data(game_name, excel_data)
+        
+        # 获取导入后的记录数
+        records_after = self.get_game_records_count(game_name)
+        
+        # 计算新增记录数
+        new_records = records_after - records_before
+        
+        return {
+            "imported_count": imported_count,
+            "records_before": records_before,
+            "records_after": records_after,
+            "new_records": new_records,
+            "is_existing_game": is_existing_game,
+            "game_name": game_name
+        }
