@@ -9,7 +9,6 @@ import datetime
 import os
 import re
 import glob
-import base64
 from pathlib import Path
 from typing import Optional, Dict, Any
 from .config import Config
@@ -286,6 +285,48 @@ async def handle_xlsxlookup(args: Message = CommandArg()):
     except Exception as e:
         await xlsxlookup_handler.finish(f"❌ 查询失败: {str(e)}")
 
+# 注册xlsx帮助命令
+xlsx_help_handler = on_command("xlsx帮助", priority=5, permission=SUPERUSER)
+
+@xlsx_help_handler.handle()
+async def handle_xlsx_help():
+    """显示Excel插件帮助信息"""
+    help_msg = "📚 Excel插件帮助\n\n"
+    
+    help_msg += "🎮 动态游戏指令:\n"
+    help_msg += "• /<游戏名> <用户名> +1 - 添加1次记录\n"
+    help_msg += "• /<游戏名> <用户名> <次数> - 添加指定次数记录\n"
+    help_msg += "  例：/原神 张三 +1 或 /原神 张三 5\n\n"
+    
+    help_msg += "📁 文件管理指令:\n"
+    help_msg += "• /文档导入 - 列出可导入的Excel文件\n"
+    help_msg += "• /文档导入 <文件名> - 导入指定Excel文件\n"
+    help_msg += "• /文档导出 <游戏名> - 导出指定游戏数据\n"
+    help_msg += "• /文档导出 all - 导出所有游戏数据\n"
+    help_msg += "• /文档导出 <游戏名|all> --upload - 导出并显示文件信息\n\n"
+    
+    help_msg += "🎯 游戏管理指令:\n"
+    help_msg += "• /创建表格 <游戏名> - 创建新游戏并注册命令\n\n"
+    
+    help_msg += "📊 查询指令:\n"
+    help_msg += "• /表格查询 <游戏名> <用户名> - 查询最新3条记录\n"
+    help_msg += "• /表格查询 <游戏名> <用户名> <数量> - 查询指定数量记录\n\n"
+    
+    help_msg += "⚙️ 使用限制:\n"
+    help_msg += "• 所有命令需要SUPERUSER权限\n"
+    help_msg += "• 次数范围：1-100\n"
+    help_msg += "• 查询记录数量范围：1-20\n"
+    help_msg += "• 支持文件格式：.xlsx、.xls\n\n"
+    
+    help_msg += "💡 提示:\n"
+    help_msg += "• 使用 /xlsx帮助 查看此帮助信息\n"
+    help_msg += "• 游戏名会根据导入的Excel文件自动注册\n"
+    help_msg += "• 达到完成次数后自动开始新周期"
+    
+    await xlsx_help_handler.finish(help_msg)
+
+# ...existing code...
+
 # 在插件加载时注册命令
 driver = get_driver()
 
@@ -322,7 +363,7 @@ async def shutdown():
     print("Excel插件已关闭")
 
 async def upload_file_to_chat(file_path: str, filename: Optional[str] = None) -> Message:
-    """上传文件到聊天"""
+    """显示文件导出信息"""
     try:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"文件不存在: {file_path}")
@@ -335,52 +376,15 @@ async def upload_file_to_chat(file_path: str, filename: Optional[str] = None) ->
         file_size = os.path.getsize(file_path)
         file_size_mb = file_size / (1024 * 1024)
         
-        # 检查文件大小（限制为30MB）
-        max_size = 30 * 1024 * 1024  # 30MB
-        if file_size > max_size:
-            raise Exception(f"文件过大: {file_size_mb:.1f}MB，最大支持30MB")
-        
+        # 构建文件信息消息
         message = Message()
+        message += MessageSegment.text(f"📎 文件导出完成\n")
+        message += MessageSegment.text(f"📁 文件名: {filename}\n")
+        message += MessageSegment.text(f"📊 大小: {file_size_mb:.2f}MB ({file_size:,} bytes)\n")
+        message += MessageSegment.text(f"💾 保存路径: {file_path}\n")
+        message += MessageSegment.text(f"💡 请从服务器获取Excel文件")
         
-        # 方案1: 尝试使用OneBot V11的文件消息段
-        try:
-            # 读取文件并编码为base64
-            with open(file_path, 'rb') as f:
-                file_data = f.read()
-            
-            file_base64 = base64.b64encode(file_data).decode('utf-8')
-            
-            # 尝试发送文件消息段（某些OneBot实现支持）
-            file_msg = MessageSegment(
-                type="file",
-                data={
-                    "file": f"base64://{file_base64}",
-                    "name": filename
-                }
-            )
-            
-            message += MessageSegment.text(f"📤 正在上传文件: {filename} ({file_size_mb:.2f}MB)")
-            message += file_msg
-            
-            return message
-            
-        except Exception as upload_error:
-            if plugin_config.debug_mode:
-                print(f"OneBot文件上传失败，使用备用方案: {upload_error}")
-            
-            # 方案2: 备用方案 - 提供文件信息和路径
-            message = Message()
-            message += MessageSegment.text(f"📎 文件导出完成\n")
-            message += MessageSegment.text(f"📁 文件名: {filename}\n")
-            message += MessageSegment.text(f"📊 大小: {file_size_mb:.2f}MB ({file_size:,} bytes)\n")
-            message += MessageSegment.text(f"💾 保存路径: {file_path}\n")
-            message += MessageSegment.text(f"⚠️  由于平台限制，请手动获取Excel文件")
-            
-            # 如果文件较小，还可以尝试其他方式
-            if file_size < 1024 * 1024:  # 小于1MB
-                message += MessageSegment.text(f"\n💡 提示: 文件较小，管理员可直接从服务器获取")
-            
-            return message
+        return message
         
     except Exception as e:
         raise Exception(f"文件处理失败: {str(e)}")
