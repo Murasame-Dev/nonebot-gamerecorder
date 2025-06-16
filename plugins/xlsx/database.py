@@ -4,7 +4,7 @@
 import sqlite3
 import os
 import datetime
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 from .config import Config
 
 class DatabaseManager:
@@ -326,3 +326,55 @@ class DatabaseManager:
                 result_msg += f"当前进度: {total_new_count}/{self.config.completion_count}"
         
         return result_msg
+    
+    def get_user_latest_records(self, username: str, game_id: int, limit: int = 3, cycle: int = 1) -> List[Tuple[str, int]]:
+        """获取用户最新的N条记录"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT r.record_date, r.count
+            FROM records r
+            JOIN users u ON r.user_id = u.id
+            WHERE u.name = ? AND u.game_id = ? AND u.cycle = ?
+            ORDER BY r.id DESC
+            LIMIT ?
+        ''', (username, game_id, cycle, limit))
+        
+        result = cursor.fetchall()
+        conn.close()
+        # 反转结果，使其按时间正序排列
+        return result[::-1]
+
+    def get_user_summary(self, username: str, game_name: str, limit: int = 3) -> Dict[str, Any]:
+        """获取用户在指定游戏中的摘要信息"""
+        game_id = self.get_game_id(game_name)
+        if not game_id:
+            return {"error": f"游戏 '{game_name}' 不存在"}
+        
+        # 获取用户的最新记录
+        latest_records = self.get_user_latest_records(username, game_id, limit)
+        
+        if not latest_records:
+            return {
+                "username": username,
+                "game_name": game_name,
+                "total_count": 0,
+                "latest_records": [],
+                "has_records": False
+            }
+        
+        # 获取用户的总记录数
+        all_records = self.get_user_records(username, game_id)
+        total_count = len(all_records)
+        current_count = all_records[-1][1] if all_records else 0
+        
+        return {
+            "username": username,
+            "game_name": game_name,
+            "total_count": total_count,
+            "current_count": current_count,
+            "latest_records": latest_records,
+            "has_records": True,
+            "completion_progress": f"{current_count}/{self.config.completion_count}"
+        }

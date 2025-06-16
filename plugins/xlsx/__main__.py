@@ -134,8 +134,8 @@ async def handle_excel_command(game_name: str, args: Message = CommandArg()):
     except Exception as e:
         return f"❌ 添加记录失败: {str(e)}"
 
-# 注册xlsximport命令
-xlsximport_handler = on_command("xlsximport", priority=5, permission=SUPERUSER)
+# 注册文档导入命令
+xlsximport_handler = on_command("文档导入", priority=5, permission=SUPERUSER)
 
 @xlsximport_handler.handle()
 async def handle_xlsximport(args: Message = CommandArg()):
@@ -156,21 +156,20 @@ async def handle_xlsximport(args: Message = CommandArg()):
         
         await xlsximport_handler.finish(result)
 
-# 注册xlsxexport命令
-xlsxexport_handler = on_command("xlsxexport", priority=5, permission=SUPERUSER)
+# 注册文档导出命令
+xlsxexport_handler = on_command("文档导出", priority=5, permission=SUPERUSER)
 
 @xlsxexport_handler.handle()
 async def handle_xlsxexport(args: Message = CommandArg()):
     """处理Excel导出命令"""
     args_text = args.extract_plain_text().strip()
-    
-    # 检查是否包含 --upload 参数
+      # 检查是否包含 --upload 参数
     upload_file = "--upload" in args_text
     if upload_file:
         args_text = args_text.replace("--upload", "").strip()
     
     if not args_text:
-        await xlsxexport_handler.finish("❌ 请提供游戏名称或使用 'all' 导出所有游戏\n使用方法: /xlsxexport <游戏名|all> [--upload]")
+        await xlsxexport_handler.finish("❌ 请提供游戏名称或使用 'all' 导出所有游戏\n使用方法: /文档导出 <游戏名|all> [--upload]")
     
     if args_text.lower() == "all":
         if upload_file:
@@ -190,8 +189,8 @@ async def handle_xlsxexport(args: Message = CommandArg()):
             result = excel_exporter.export_game_to_excel(game_name)
             await xlsxexport_handler.finish(result)
 
-# 注册xlsxcreate命令
-xlsxcreate_handler = on_command("xlsxcreate", priority=5, permission=SUPERUSER)
+# 注册创建表格命令
+xlsxcreate_handler = on_command("创建表格", priority=5, permission=SUPERUSER)
 
 @xlsxcreate_handler.handle()
 async def handle_xlsxcreate(args: Message = CommandArg()):
@@ -199,7 +198,7 @@ async def handle_xlsxcreate(args: Message = CommandArg()):
     game_name = args.extract_plain_text().strip()
     
     if not game_name:
-        await xlsxcreate_handler.finish("❌ 请提供游戏名称！\n使用方法: /xlsxcreate <游戏名>")
+        await xlsxcreate_handler.finish("❌ 请提供游戏名称！\n使用方法: /创建表格 <游戏名>")
     
     # 检查游戏名是否已存在
     existing_games = db_manager.get_games_list()
@@ -220,7 +219,7 @@ async def handle_xlsxcreate(args: Message = CommandArg()):
             result_msg += f"现在可以使用以下命令:\n"
             result_msg += f"• /{game_name} <用户名> +1 - 添加记录\n"
             result_msg += f"• /{game_name} <用户名> <次数> - 批量添加记录\n"
-            result_msg += f"• /xlsxexport {game_name} - 导出数据"
+            result_msg += f"• /文档导出 {game_name} - 导出数据"
             
             await xlsxcreate_handler.finish(result_msg)
         else:
@@ -229,8 +228,8 @@ async def handle_xlsxcreate(args: Message = CommandArg()):
     except Exception as e:
         await xlsxcreate_handler.finish(f"❌ 创建游戏时出错: {str(e)}")
 
-# 注册xlsxlookup命令
-xlsxlookup_handler = on_command("xlsxlookup", priority=5, permission=SUPERUSER)
+# 注册表格查询命令
+xlsxlookup_handler = on_command("表格查询", priority=5, permission=SUPERUSER)
 
 @xlsxlookup_handler.handle()
 async def handle_xlsxlookup(args: Message = CommandArg()):
@@ -238,12 +237,12 @@ async def handle_xlsxlookup(args: Message = CommandArg()):
     args_text = args.extract_plain_text().strip()
     
     if not args_text:
-        await xlsxlookup_handler.finish("❌ 请提供查询参数！\n使用方法: /xlsxlookup <游戏名> <用户名> [记录数量]")
+        await xlsxlookup_handler.finish("❌ 请提供查询参数！\n使用方法: /表格查询 <游戏名> <用户名> [记录数量]")
     
     # 解析参数
     parts = args_text.split()
     if len(parts) < 2:
-        await xlsxlookup_handler.finish("❌ 参数不足！\n使用方法: /xlsxlookup <游戏名> <用户名> [记录数量]")
+        await xlsxlookup_handler.finish("❌ 参数不足！\n使用方法: /表格查询 <游戏名> <用户名> [记录数量]")
     
     game_name = parts[0]
     username = parts[1]

@@ -28,3 +28,21 @@ class Config(BaseModel):
     # ===== 游戏逻辑配置 =====
     # 完成一个周期所需的次数
     completion_count: int = int(os.getenv("COMPLETION_COUNT", "30"))
+    
+    # ===== 文件导入配置 =====
+    # 文件选择超时时间（秒）
+    file_selection_timeout: int = int(os.getenv("FILE_SELECTION_TIMEOUT", "30"))
+    
+    # 私聊文件等待超时时间（秒）
+    private_file_timeout: int = int(os.getenv("PRIVATE_FILE_TIMEOUT", "30"))
+    
+    # 群文件导入配置
+    # 最多显示的xlsx文件记录数
+    max_xlsx_records: int = int(os.getenv("MAX_XLSX_RECORDS", "5"))
+    
+    # 群文件导入超时时间（秒）
+    group_file_timeout: int = int(os.getenv("GROUP_FILE_TIMEOUT", "30"))
+    
+    # ===== 查询配置 =====
+    # 默认查询显示的最新记录数
+    default_lookup_count: int = int(os.getenv("DEFAULT_LOOKUP_COUNT", "3"))

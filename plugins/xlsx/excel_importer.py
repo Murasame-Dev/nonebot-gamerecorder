@@ -96,6 +96,33 @@ class ExcelImporter:
         except Exception as e:
             return f"❌ 导入失败: {str(e)}"
     
+    def import_excel(self, file_path: str) -> str:
+        """通用Excel导入方法，支持任意路径的Excel文件"""
+        if not os.path.exists(file_path):
+            return f"❌ 文件不存在: {file_path}"
+        
+        # 获取游戏名（从文件名提取）
+        game_name = os.path.basename(file_path)
+        if game_name.endswith('.xlsx'):
+            game_name = game_name[:-5]
+        elif game_name.endswith('.xls'):
+            game_name = game_name[:-4]
+        
+        try:
+            # 读取Excel数据
+            excel_data = self.read_excel_data(file_path)
+            
+            if not excel_data:
+                return f"❌ 文件 {os.path.basename(file_path)} 没有有效数据"
+            
+            # 导入到数据库
+            imported_count = self.db_manager.import_from_excel_data(game_name, excel_data)
+            
+            return f"✅ 成功导入文件: {os.path.basename(file_path)}\n游戏: {game_name}\n导入记录数: {imported_count}"
+            
+        except Exception as e:
+            return f"❌ 导入失败: {str(e)}"
+    
     def list_available_files(self) -> str:
         """列出可用的Excel文件"""
         excel_files = self.get_excel_files()
