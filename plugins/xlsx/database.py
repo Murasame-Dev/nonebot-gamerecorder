@@ -295,10 +295,10 @@ class DatabaseManager:
         total_new_count = current_count
         
         for i in range(count):
-            total_new_count += 1
-            # 获取当前日期
+            total_new_count += 1            # 获取当前日期
             today = datetime.datetime.now().strftime("%m-%d")
-              # 添加记录
+            
+            # 添加记录
             self.add_record(user_id, today, total_new_count)
             records_added.append(f"{today}_{total_new_count}")
             

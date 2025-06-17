@@ -121,9 +121,8 @@ async def handle_excel_command(game_name: str, args: Message = CommandArg()):
     if count <= 0 or count > 100:
         return f"❌ 次数必须在1-100之间！"
     
-    try:
-        # 添加用户记录
-        result = db_manager.add_user_record(game_name, username, count)
+    try:        # 添加用户记录
+        result = db_manager.add_user_record(username, game_name, count)
         
         if count == 1:
             return f"✅ 已为 {username} 添加1次 {game_name} 记录\n{result}"
